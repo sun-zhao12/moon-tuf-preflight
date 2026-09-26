@@ -66,11 +66,12 @@ fn targets(expires : String, name : String, digest : String) -> String {
 }
 
 ///|
-/// Wrap the JSON text of a `signed` object in a signature envelope.
+/// Wrap the JSON text of a `signed` object in a signature envelope, stamping
+/// the TUF specification version the demo metadata is written against.
 ///
 /// The signature values are placeholders: this library never verifies them.
 fn envelope(body : String) -> String {
-  "{\"signed\":" +
-  body +
+  "{\"signed\":{\"spec_version\":\"1.0.31\"," +
+  body[1:].to_owned() +
   ",\"signatures\":[{\"keyid\":\"demo-key\",\"sig\":\"demo-only\"}]}"
 }

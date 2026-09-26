@@ -54,6 +54,35 @@ fn digit_pair(a : Char, b : Char) -> Int {
 }
 
 ///|
+/// Whether `value` is a dotted numeric version such as `1`, `1.0` or `1.0.31`.
+///
+/// TUF metadata carries the specification version that the file was written
+/// against. This accepts the numeric forms repositories use in practice and
+/// rejects anything else, so a typo like `v1.0` or `1.0.31-beta` is surfaced
+/// rather than silently ignored. It intentionally does not enforce a fixed
+/// number of components: clients are required to be tolerant of extra ones.
+fn valid_spec_version(value : String) -> Bool {
+  if value == "" {
+    return false
+  }
+  let mut digits = 0
+  for char in value.iter() {
+    if char == '.' {
+      if digits == 0 {
+        // Leading dot or two dots in a row.
+        return false
+      }
+      digits = 0
+    } else if char >= '0' && char <= '9' {
+      digits += 1
+    } else {
+      return false
+    }
+  }
+  digits > 0
+}
+
+///|
 /// Lexicographic ordering of two `YYYY-MM-DDTHH:MM:SSZ` strings.
 ///
 /// Because the format is fixed-width and big-endian, string comparison is the

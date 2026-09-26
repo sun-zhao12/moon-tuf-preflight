@@ -8,10 +8,25 @@ let sha256_hex : String = "0123456789abcdef".repeat(4)
 let sha512_hex : String = "0123456789abcdef".repeat(8)
 
 ///|
+/// The specification version stamped into every fixture, matching the TUF
+/// metadata version this preflight targets.
+let spec_version : String = "1.0.31"
+
+///|
 /// A structurally valid single-signature envelope around `body`, which must be
-/// the JSON text of the `signed` object.
+/// the JSON text of the `signed` object beginning with `{`.
+///
+/// The `spec_version` field is injected here so that fixtures stay focused on
+/// the field under test instead of repeating shared metadata on every line. The
+/// dedicated spec-version test builds its `signed` object by hand.
 fn envelope(body : String) -> String {
-  "{\"signed\":" + body + ",\"signatures\":[{\"keyid\":\"k1\",\"sig\":\"s1\"}]}"
+  let with_spec_version = "{\"spec_version\":\"" +
+    spec_version +
+    "\"," +
+    body[1:].to_owned()
+  "{\"signed\":" +
+  with_spec_version +
+  ",\"signatures\":[{\"keyid\":\"k1\",\"sig\":\"s1\"}]}"
 }
 
 ///|
@@ -79,6 +94,42 @@ test "malformed JSON and wrong envelope shapes are reported" {
     "error:missing-signed-object",
   ])
   assert_eq(preflight("{}", "mirror"), ["error:unsupported-role:mirror"])
+}
+
+///|
+test "the declared specification version is checked" {
+  let signed = fn(spec : String) {
+    "{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{},\"spec_version\":\"" +
+    spec +
+    "\"}"
+  }
+  for accepted in ["1", "1.0", "1.0.31", "10.2.7"] {
+    assert_eq(preflight(envelope(signed(accepted)), "targets"), [])
+  }
+  for
+    malformed in [
+      "", "v1.0", "1.0.", ".1", "1..0", "1.0.31-beta", "1.0.31+meta",
+    ] {
+    let report = preflight_report(envelope(signed(malformed)), "targets")
+    // The empty version renders without a location suffix, so assert on the
+    // structured finding instead of rebuilding the rendered string.
+    assert_true(
+      report
+      .findings()
+      .any(finding => {
+        finding.code == "malformed-spec-version" &&
+        finding.location == malformed
+      }),
+    )
+    assert_eq(report.error_count(), 0)
+  }
+  // A document without the field stays usable, it is only flagged. This
+  // envelope is written by hand because `envelope` always injects the field.
+  let missing = "{\"signed\":{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}},\"signatures\":[{\"keyid\":\"k1\",\"sig\":\"s1\"}]}"
+  let report = preflight_report(missing, "targets")
+  assert_true(report.to_strings().contains("warning:missing-spec-version"))
+  assert_eq(report.error_count(), 0)
+  assert_true(report.ok())
 }
 
 ///|

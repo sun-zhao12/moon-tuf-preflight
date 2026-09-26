@@ -44,6 +44,8 @@ Findings are stable strings of the form `severity:code[:location]`, where `sever
 | `error:role-mismatch:targets` | `signed._type` is not the requested role |
 | `error:invalid-version` | `version` is missing, fractional, zero or out of range |
 | `error:invalid-expires` | `expires` is not an exact `YYYY-MM-DDTHH:MM:SSZ` UTC time |
+| `warning:missing-spec-version` | the document declares no `spec_version` (pre-1.0 metadata) |
+| `warning:malformed-spec-version:v1.0` | `spec_version` is not a dotted numeric version |
 | `error:expired:2030-06-01T12:30:00Z` | `expires <= now`, reported by `preflight_at*` |
 | `error:empty-signatures` | the `signatures` array is empty |
 | `error:duplicate-signature-keyid:k1` | the same `keyid` signs twice |

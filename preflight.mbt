@@ -188,6 +188,25 @@ fn collect_findings(
         location: "",
       })
   }
+  // TUF 1.0 metadata declares the specification version it was written for.
+  // It is reported as a warning rather than an error because pre-1.0
+  // repositories still publish metadata without it, and clients are required to
+  // tolerate its absence.
+  match signed.get("spec_version") {
+    Some(String(value)) if valid_spec_version(value) => ()
+    Some(String(value)) =>
+      findings.push(Finding::{
+        severity: Warning,
+        code: "malformed-spec-version",
+        location: value,
+      })
+    _ =>
+      findings.push(Finding::{
+        severity: Warning,
+        code: "missing-spec-version",
+        location: "",
+      })
+  }
   match role {
     "root" => check_root(signed, findings)
     "timestamp" | "snapshot" => check_meta(signed, role, findings)
