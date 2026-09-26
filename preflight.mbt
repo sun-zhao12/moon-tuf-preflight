@@ -646,8 +646,10 @@ fn check_role_keyids(
 /// Validate a `timestamp` or `snapshot` document's `meta` table.
 ///
 /// `timestamp` must reference `snapshot.json`, `snapshot` must reference
-/// `targets.json`, and every entry needs an integer `version`. Hashes, when
-/// present, are checked for length and hex characters only.
+/// `targets.json`, and every entry needs an integer `version`. The optional
+/// `length` and `hashes` fields are checked with the same rules as target
+/// entries, because a snapshot that describes a metadata file with a malformed
+/// digest would otherwise be accepted silently.
 fn check_meta(
   signed : Map[String, Json],
   role : String,
@@ -686,16 +688,7 @@ fn check_meta(
   for entry in meta.iter() {
     let (name, value) = entry
     match value {
-      Object(entry) =>
-        match entry.get("version") {
-          Some(Number(number, ..)) if in_int_range(number) => ()
-          _ =>
-            findings.push(Finding::{
-              severity: Error,
-              code: "invalid-meta-version",
-              location: name,
-            })
-        }
+      Object(entry) => check_meta_entry(name, entry, findings)
       _ =>
         findings.push(Finding::{
           severity: Error,
@@ -703,6 +696,66 @@ fn check_meta(
           location: name,
         })
     }
+  }
+}
+
+///|
+/// Validate one entry of a `meta` table: a required integer `version`, and the
+/// optional `length` and `hashes` fields when they are present.
+fn check_meta_entry(
+  name : String,
+  entry : Map[String, Json],
+  findings : Array[Finding],
+) -> Unit {
+  match entry.get("version") {
+    Some(Number(number, ..)) if in_int_range(number) => ()
+    _ =>
+      findings.push(Finding::{
+        severity: Error,
+        code: "invalid-meta-version",
+        location: name,
+      })
+  }
+  match entry.get("length") {
+    None => ()
+    Some(Number(length, ..)) if length >= 0.0 &&
+      length <= 9007199254740991.0 &&
+      length == length.floor() => ()
+    _ =>
+      findings.push(Finding::{
+        severity: Error,
+        code: "invalid-meta-length",
+        location: name,
+      })
+  }
+  match entry.get("hashes") {
+    None => ()
+    Some(Object(hashes)) => {
+      if hashes.is_empty() {
+        findings.push(Finding::{
+          severity: Error,
+          code: "invalid-meta-hashes",
+          location: name,
+        })
+      }
+      for digest in hashes.iter() {
+        let (algorithm, value) = digest
+        check_digest(
+          algorithm,
+          value,
+          "invalid-meta-hash",
+          "unsupported-meta-hash-algorithm",
+          name + ":" + algorithm,
+          findings,
+        )
+      }
+    }
+    Some(_) =>
+      findings.push(Finding::{
+        severity: Error,
+        code: "invalid-meta-hashes",
+        location: name,
+      })
   }
 }
 
@@ -786,6 +839,46 @@ fn check_targets(signed : Map[String, Json], findings : Array[Finding]) -> Unit 
 }
 
 ///|
+/// Check one `algorithm: digest` pair.
+///
+/// `location` is `<entry>:<algorithm>`, `invalid_code` is reported when the
+/// digest is not a hex string of the length that `algorithm` requires, and
+/// `unsupported_code` is reported for algorithms this preflight cannot measure.
+/// Both target entries and `snapshot`'s `meta` entries describe file digests, so
+/// they share the implementation and differ only in the codes they emit.
+fn check_digest(
+  algorithm : String,
+  value : Json,
+  invalid_code : String,
+  unsupported_code : String,
+  location : String,
+  findings : Array[Finding],
+) -> Unit {
+  let digest = match value {
+    String(digest) => digest
+    _ => {
+      findings.push(Finding::{ severity: Error, code: invalid_code, location, })
+      return
+    }
+  }
+  let expected = match algorithm {
+    "sha256" | "sha3-256" => 64
+    "sha512" | "sha3-512" => 128
+    _ => {
+      findings.push(Finding::{
+        severity: Warning,
+        code: unsupported_code,
+        location,
+      })
+      return
+    }
+  }
+  if digest.length() != expected || !valid_hex(digest) {
+    findings.push(Finding::{ severity: Error, code: invalid_code, location, })
+  }
+}
+
+///|
 /// Check one `algorithm: digest` pair of a target's `hashes` map.
 ///
 /// Supported digest lengths follow the TUF specification's hash function list.
@@ -798,37 +891,14 @@ fn check_target_hash(
   value : Json,
   findings : Array[Finding],
 ) -> Unit {
-  let location = name + ":" + algorithm
-  let digest = match value {
-    String(digest) => digest
-    _ => {
-      findings.push(Finding::{
-        severity: Error,
-        code: "invalid-target-hash",
-        location,
-      })
-      return
-    }
-  }
-  let expected = match algorithm {
-    "sha256" | "sha3-256" => 64
-    "sha512" | "sha3-512" => 128
-    _ => {
-      findings.push(Finding::{
-        severity: Warning,
-        code: "unsupported-target-hash-algorithm",
-        location,
-      })
-      return
-    }
-  }
-  if digest.length() != expected || !valid_hex(digest) {
-    findings.push(Finding::{
-      severity: Error,
-      code: "invalid-target-hash",
-      location,
-    })
-  }
+  check_digest(
+    algorithm,
+    value,
+    "invalid-target-hash",
+    "unsupported-target-hash-algorithm",
+    name + ":" + algorithm,
+    findings,
+  )
 }
 
 ///|

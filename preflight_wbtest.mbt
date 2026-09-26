@@ -241,6 +241,56 @@ test "root keys, roles and thresholds are checked" {
 }
 
 ///|
+/// A `snapshot` document whose `targets.json` entry carries `extra` fields, so
+/// tests can exercise the optional `length` and `hashes` validation.
+fn snapshot_entry(extra : String) -> String {
+  envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"targets.json\":{\"version\":3" +
+    extra +
+    "}}}",
+  )
+}
+
+///|
+test "optional meta length and hashes are validated" {
+  // Both fields are optional and stay accepted when they are well formed.
+  assert_eq(
+    preflight(
+      snapshot_entry(
+        ",\"length\":1024,\"hashes\":{\"sha256\":\"" + sha256_hex + "\"}",
+      ),
+      "snapshot",
+    ),
+    [],
+  )
+  assert_eq(preflight(snapshot_entry(",\"length\":0"), "snapshot"), [])
+  let bad_length = preflight(snapshot_entry(",\"length\":-5"), "snapshot")
+  assert_true(bad_length.contains("error:invalid-meta-length:targets.json"))
+  let fractional = preflight(snapshot_entry(",\"length\":2.5"), "snapshot")
+  assert_true(fractional.contains("error:invalid-meta-length:targets.json"))
+  let empty_hashes = preflight(snapshot_entry(",\"hashes\":{}"), "snapshot")
+  assert_true(empty_hashes.contains("error:invalid-meta-hashes:targets.json"))
+  let not_object = preflight(snapshot_entry(",\"hashes\":[]"), "snapshot")
+  assert_true(not_object.contains("error:invalid-meta-hashes:targets.json"))
+  let short_digest = preflight(
+    snapshot_entry(",\"hashes\":{\"sha256\":\"abc\"}"),
+    "snapshot",
+  )
+  assert_true(
+    short_digest.contains("error:invalid-meta-hash:targets.json:sha256"),
+  )
+  let unknown_algorithm = preflight(
+    snapshot_entry(",\"hashes\":{\"md5\":\"abc\"}"),
+    "snapshot",
+  )
+  assert_true(
+    unknown_algorithm.contains(
+      "warning:unsupported-meta-hash-algorithm:targets.json:md5",
+    ),
+  )
+}
+
+///|
 test "timestamp and snapshot meta tables are validated" {
   let timestamp = envelope(
     "{\"_type\":\"timestamp\",\"version\":4,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"snapshot.json\":{\"version\":3}}}",

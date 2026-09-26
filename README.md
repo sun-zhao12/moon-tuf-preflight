@@ -51,6 +51,11 @@ Findings are stable strings of the form `severity:code[:location]`, where `sever
 | `error:duplicate-signature-keyid:k1` | the same `keyid` signs twice |
 | `error:unknown-keyid:root:k1` | a role references a key that is not in `keys` |
 | `error:unreachable-threshold:root:threshold=2,usable=1` | fewer usable keys than the threshold |
+| `error:missing-meta:snapshot.json` | a timestamp does not reference the snapshot it should |
+| `error:invalid-meta-version:targets.json` | a `meta` entry has no valid integer version |
+| `error:invalid-meta-length:targets.json` | a `meta` entry's optional `length` is not a non-negative integer |
+| `error:invalid-meta-hashes:targets.json` | a `meta` entry's optional `hashes` is not a non-empty object |
+| `error:invalid-meta-hash:targets.json:sha256` | a `meta` digest is not hex or has the wrong length |
 | `error:unsafe-target-path:../app` | absolute, `..`, `.`, empty or backslash/colon path |
 | `error:invalid-target-hash:app.bin:sha256` | digest is not hex or not the expected length |
 | `warning:unsupported-target-hash-algorithm:app.bin:md5` | digest algorithm is not `sha256`, `sha3-256`, `sha512` or `sha3-512` |
