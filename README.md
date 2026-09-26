@@ -38,7 +38,9 @@ if not(report.ok()) {
 
 ### Findings
 
-Findings are stable strings of the form `severity:code[:location]`, where `severity` is `error` or `warning`. A `location` is the key id, meta file name, target path or document name the finding belongs to; it is omitted when the finding applies to the whole envelope. Every code this library can emit is listed below, and `preflight_wbtest.mbt` fails if this table and the implementation ever disagree.
+Findings are stable strings of the form `severity:code[:location]`, where `severity` is `error` or `warning`. A `location` is the key id, meta file name, target path or document name the finding belongs to; it is omitted when the finding applies to the whole envelope. `finding_codes()` returns every code the library can emit, sorted by character codes, so a consumer can size a dashboard, diff two library versions or reject a code it does not know.
+
+Note that MoonBit's own `<` for strings is *shortlex* order (length first), so it is not usable for sorting codes; `compare_ordinal` and `is_sorted_ordinal` provide the ordinal order that `finding_codes()` guarantees.
 
 **Envelope and shared fields**
 

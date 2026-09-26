@@ -2,6 +2,12 @@
 package "sun-zhao12/moon-tuf-preflight"
 
 // Values
+pub fn compare_ordinal(StringView, StringView) -> Int
+
+pub fn finding_codes() -> Array[String]
+
+pub fn is_sorted_ordinal(ArrayView[String]) -> Bool
+
 pub fn preflight(String, String) -> Array[String]
 
 pub fn preflight_at(String, String, String) -> Array[String]

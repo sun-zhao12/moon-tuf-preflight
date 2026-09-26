@@ -135,6 +135,74 @@ pub fn Report::render(self : Report) -> String {
 }
 
 ///|
+/// Compare two strings by character codes, the ordering usually called
+/// lexicographic or "ordinal".
+///
+/// This exists because MoonBit's own `String` comparison is *shortlex*: it
+/// compares lengths first, so `"duplicate-signature-keyid" < "empty-keyid"` is
+/// false even though `d` sorts before `e`. Sorting a list of codes therefore
+/// needs this helper, and consumers that want the documented order of
+/// [`finding_codes`] should use it too.
+pub fn compare_ordinal(left : StringView, right : StringView) -> Int {
+  let left_chars = left.iter().to_array()
+  let right_chars = right.iter().to_array()
+  let limit = if left_chars.length() < right_chars.length() {
+    left_chars.length()
+  } else {
+    right_chars.length()
+  }
+  for i in 0..<limit {
+    let difference = left_chars[i].to_int() - right_chars[i].to_int()
+    if difference != 0 {
+      return difference
+    }
+  }
+  left_chars.length() - right_chars.length()
+}
+
+///|
+/// Whether `values` is strictly increasing under [`compare_ordinal`], which is
+/// the order [`finding_codes`] promises.
+///
+/// Exposed so a consumer can assert the same property over its own copy of the
+/// list, and so the library's own check builds do not treat the helper as dead
+/// code (the test suite is compiled separately from the library).
+pub fn is_sorted_ordinal(values : ArrayView[String]) -> Bool {
+  for i in 1..<values.length() {
+    if compare_ordinal(values[i - 1], values[i]) >= 0 {
+      return false
+    }
+  }
+  true
+}
+
+///|
+/// Every diagnostic code this library can emit, sorted with
+/// [`compare_ordinal`].
+///
+/// Consumers that sort, filter or count findings often need to know the full
+/// set up front, for example to size a dashboard or to reject a code that a
+/// newer version of the library introduced. Codes that carry a location are
+/// listed without one; the bundle codes appear under their bare code.
+pub fn finding_codes() -> Array[String] {
+  [
+    "duplicate-keyid", "duplicate-signature-keyid", "empty-keyid", "empty-meta",
+    "empty-signatures", "envelope-not-object", "expired", "invalid-current-time",
+    "invalid-expires", "invalid-json", "invalid-key", "invalid-key-scheme", "invalid-keyid",
+    "invalid-keytype", "invalid-keyval", "invalid-meta-entry", "invalid-meta-hash",
+    "invalid-meta-hashes", "invalid-meta-length", "invalid-meta-version", "invalid-public-key",
+    "invalid-signature-entry", "invalid-signature-keyid", "invalid-signature-value",
+    "invalid-target-entry", "invalid-target-hash", "invalid-target-length", "invalid-threshold",
+    "invalid-version", "malformed-spec-version", "missing-document-version", "missing-keyids",
+    "missing-keys", "missing-meta", "missing-role", "missing-roles", "missing-signatures-array",
+    "missing-signed-object", "missing-spec-version", "missing-target-hashes", "missing-targets",
+    "missing-version-reference", "non-object-target-custom", "role-mismatch", "snapshot-version-mismatch",
+    "targets-version-mismatch", "unknown-keyid", "unreachable-threshold", "unsafe-target-path",
+    "unsupported-meta-hash-algorithm", "unsupported-role", "unsupported-target-hash-algorithm",
+  ]
+}
+
+///|
 /// Core routine: append findings for `document` interpreted as `role`.
 ///
 /// `role` must be one of `root`, `timestamp`, `snapshot` or `targets`; any

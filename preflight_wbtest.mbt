@@ -97,6 +97,70 @@ test "malformed JSON and wrong envelope shapes are reported" {
 }
 
 ///|
+/// The set of documented diagnostic codes, copied from the README reference
+/// table. `tests/check_documented_codes.ps1` compares this list with the
+/// `code:` literals in the source and with the README itself, so the three
+/// cannot drift apart unnoticed.
+let documented_codes : Array[String] = [
+  "duplicate-keyid", "duplicate-signature-keyid", "empty-keyid", "empty-meta", "empty-signatures",
+  "envelope-not-object", "expired", "invalid-current-time", "invalid-expires", "invalid-json",
+  "invalid-key", "invalid-key-scheme", "invalid-keyid", "invalid-keytype", "invalid-keyval",
+  "invalid-meta-entry", "invalid-meta-hash", "invalid-meta-hashes", "invalid-meta-length",
+  "invalid-meta-version", "invalid-public-key", "invalid-signature-entry", "invalid-signature-keyid",
+  "invalid-signature-value", "invalid-target-entry", "invalid-target-hash", "invalid-target-length",
+  "invalid-threshold", "invalid-version", "malformed-spec-version", "missing-document-version",
+  "missing-keyids", "missing-keys", "missing-meta", "missing-role", "missing-roles",
+  "missing-signatures-array", "missing-signed-object", "missing-spec-version", "missing-target-hashes",
+  "missing-targets", "missing-version-reference", "non-object-target-custom", "role-mismatch",
+  "snapshot-version-mismatch", "targets-version-mismatch", "unknown-keyid", "unreachable-threshold",
+  "unsafe-target-path", "unsupported-meta-hash-algorithm", "unsupported-role", "unsupported-target-hash-algorithm",
+]
+
+///|
+test "the published code list covers every diagnostic the library emits" {
+  let published = finding_codes()
+  // The README table and the published list describe the same set.
+  assert_eq(published.length(), documented_codes.length())
+  for code in documented_codes {
+    assert_true(published.contains(code))
+  }
+  // The list must be sorted by character codes and free of duplicates, which is
+  // what a consumer relies on when it binary-searches or diffs the list.
+  for i in 1..<published.length() {
+    if compare_ordinal(published[i - 1], published[i]) >= 0 {
+      println(
+        "out of order at " +
+        i.to_string() +
+        ": [" +
+        published[i - 1] +
+        "] then [" +
+        published[i] +
+        "]",
+      )
+      fail("finding_codes() must be sorted by compare_ordinal")
+    }
+  }
+}
+
+///|
+test "ordinal comparison is not shortlex comparison" {
+  // MoonBit's own `<` for strings compares lengths first, which is shortlex
+  // order. A code list sorted that way would not be searchable, so the library
+  // ships compare_ordinal and the list is verified against it.
+  assert_false("duplicate-signature-keyid" < "empty-keyid")
+  assert_true(compare_ordinal("duplicate-signature-keyid", "empty-keyid") < 0)
+  assert_eq(compare_ordinal("abc", "abc"), 0)
+  assert_true(compare_ordinal("abc", "abcd") < 0)
+  assert_true(compare_ordinal("b", "a") > 0)
+  assert_true(compare_ordinal("", "a") < 0)
+  assert_true(compare_ordinal("a", "") > 0)
+  assert_true(compare_ordinal("a", "b") < 0)
+  assert_true(is_sorted_ordinal(["a", "b", "bb", "c"]))
+  assert_false(is_sorted_ordinal(["b", "a"]))
+  assert_false(is_sorted_ordinal(["a", "a"]))
+}
+
+///|
 test "the declared specification version is checked" {
   let signed = fn(spec : String) {
     "{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{},\"spec_version\":\"" +
