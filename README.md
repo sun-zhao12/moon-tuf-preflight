@@ -28,38 +28,104 @@ For severity, counts and a typed result, use the `Report` API:
 let report = @moon-tuf-preflight.preflight_at_report(targets_json, "targets", now)
 if not(report.ok()) {
   for finding in report.findings() {
-    println(finding.severity.to_string() + " " + finding.code + " at " + finding.location)
+    match finding.severity() {
+      Error => println("error " + finding.code() + " at " + finding.location())
+      Warning => println("warn  " + finding.code() + " at " + finding.location())
+    }
   }
 }
 ```
 
 ### Findings
 
-Findings are stable strings of the form `severity:code[:location]`, where `severity` is `error` or `warning`:
+Findings are stable strings of the form `severity:code[:location]`, where `severity` is `error` or `warning`. A `location` is the key id, meta file name, target path or document name the finding belongs to; it is omitted when the finding applies to the whole envelope. Every code this library can emit is listed below, and `preflight_wbtest.mbt` fails if this table and the implementation ever disagree.
+
+**Envelope and shared fields**
 
 | Example | Meaning |
 | --- | --- |
 | `error:invalid-json` | the input is not JSON |
+| `error:envelope-not-object` | the top-level JSON value is not an object |
 | `error:missing-signed-object` | the envelope has no object-valued `signed` |
-| `error:role-mismatch:targets` | `signed._type` is not the requested role |
+| `error:unsupported-role:<role>` | the requested role is not `root`, `timestamp`, `snapshot` or `targets` |
+| `error:role-mismatch:<role>` | `signed._type` is not the requested role |
 | `error:invalid-version` | `version` is missing, fractional, zero or out of range |
 | `error:invalid-expires` | `expires` is not an exact `YYYY-MM-DDTHH:MM:SSZ` UTC time |
 | `warning:missing-spec-version` | the document declares no `spec_version` (pre-1.0 metadata) |
 | `warning:malformed-spec-version:v1.0` | `spec_version` is not a dotted numeric version |
+| `error:invalid-current-time` | the `now` argument of `preflight_at*` is not a valid UTC time |
 | `error:expired:2030-06-01T12:30:00Z` | `expires <= now`, reported by `preflight_at*` |
+
+**Signatures** (entry shape only, never verified)
+
+| Example | Meaning |
+| --- | --- |
+| `error:missing-signatures-array` | `signatures` is absent or not an array |
 | `error:empty-signatures` | the `signatures` array is empty |
+| `error:invalid-signature-entry` | an entry is not an object |
+| `error:invalid-signature-keyid` | an entry has no non-empty `keyid` |
+| `error:invalid-signature-value:k1` | an entry has no non-empty `sig` |
 | `error:duplicate-signature-keyid:k1` | the same `keyid` signs twice |
+
+**`root`**
+
+| Example | Meaning |
+| --- | --- |
+| `error:missing-keys` | `keys` is absent or not an object |
+| `error:missing-roles` | `roles` is absent or not an object |
+| `error:empty-keyid` | `keys` contains an empty key id |
+| `error:invalid-key:k1` | a key entry is not an object |
+| `error:invalid-keytype:k1` | a key has no non-empty `keytype` |
+| `error:invalid-key-scheme:k1` | a key has no non-empty `scheme` |
+| `error:invalid-keyval:k1` | `keyval` is absent or not an object |
+| `error:invalid-public-key:k1` | `keyval.public` is absent or empty |
+| `error:missing-role:root` | one of the four top-level roles is absent |
+| `error:invalid-threshold:root` | `threshold` is not an integer of at least 1 |
+| `error:missing-keyids:root` | `keyids` is absent, not an array, or empty |
+| `error:invalid-keyid:root` | a `keyids` element is not a string |
+| `error:duplicate-keyid:root:k1` | a role lists the same key id twice |
 | `error:unknown-keyid:root:k1` | a role references a key that is not in `keys` |
 | `error:unreachable-threshold:root:threshold=2,usable=1` | fewer usable keys than the threshold |
-| `error:missing-meta:snapshot.json` | a timestamp does not reference the snapshot it should |
-| `error:invalid-meta-version:targets.json` | a `meta` entry has no valid integer version |
+
+**`timestamp` and `snapshot`**
+
+| Example | Meaning |
+| --- | --- |
+| `error:missing-meta:timestamp` | `meta` is absent or not an object |
+| `error:empty-meta:timestamp` | `meta` is an empty object |
+| `error:missing-meta:snapshot.json` | the required reference (`snapshot.json` / `targets.json`) is absent |
+| `error:invalid-meta-entry:targets.json` | a `meta` entry is not an object |
+| `error:invalid-meta-version:targets.json` | a `meta` entry has no valid integer `version` |
 | `error:invalid-meta-length:targets.json` | a `meta` entry's optional `length` is not a non-negative integer |
 | `error:invalid-meta-hashes:targets.json` | a `meta` entry's optional `hashes` is not a non-empty object |
 | `error:invalid-meta-hash:targets.json:sha256` | a `meta` digest is not hex or has the wrong length |
+| `warning:unsupported-meta-hash-algorithm:targets.json:md5` | a `meta` digest algorithm is not `sha256`, `sha3-256`, `sha512` or `sha3-512` |
+
+**`targets`**
+
+| Example | Meaning |
+| --- | --- |
+| `error:missing-targets` | `targets` is absent or not an object |
+| `error:invalid-target-entry:app.bin` | a target entry is not an object |
 | `error:unsafe-target-path:../app` | absolute, `..`, `.`, empty or backslash/colon path |
+| `error:invalid-target-length:app.bin` | `length` is not a non-negative integer |
+| `error:missing-target-hashes:app.bin` | `hashes` is absent, not an object, or empty |
 | `error:invalid-target-hash:app.bin:sha256` | digest is not hex or not the expected length |
 | `warning:unsupported-target-hash-algorithm:app.bin:md5` | digest algorithm is not `sha256`, `sha3-256`, `sha512` or `sha3-512` |
-| `error:snapshot-version-mismatch:snapshot.json:referenced=2,actual=1` | bundle version disagreement |
+| `warning:non-object-target-custom:app.bin` | `custom` is present but neither an object nor `null` |
+
+**Bundle** (reported by `preflight_bundle*`)
+
+Per-document findings keep the severity prefix and gain the document name as a code segment, so a finding from the timestamp document is rendered as `error:timestamp:expired:...`. Cross-document findings are not per-document and are rendered normally.
+
+| Example | Meaning |
+| --- | --- |
+| `error:timestamp:expired:2030-01-01T00:00:00Z` | a timestamp finding, carrying its document name as a code segment |
+| `error:snapshot:invalid-meta-version:targets.json` | the same rule for the snapshot document |
+| `error:snapshot-version-mismatch:snapshot.json:referenced=2,actual=1` | the timestamp references a different snapshot version |
+| `error:targets-version-mismatch:targets.json:referenced=1,actual=3` | the snapshot references a different targets version |
+| `error:missing-version-reference:timestamp->snapshot.json` | the referring document has no usable `meta` version |
+| `error:missing-document-version:targets.json` | the referenced document has no usable `version` |
 
 Inputs must use second-resolution UTC with a trailing `Z`. Digest checks cover hex characters and digest length only; no file is read. The current time is always a parameter, so CI, Wasm and offline runs reproduce identical output.
 

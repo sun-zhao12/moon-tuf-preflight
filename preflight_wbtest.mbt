@@ -542,16 +542,21 @@ test "bundle checks reference versions in both directions" {
   let no_version = preflight_bundle_report(
     matching, snapshot, undated_targets, "2026-09-24T00:00:00Z",
   ).to_strings()
-  assert_true(
-    no_version.contains("error:missing-document-version:targets.json"),
-  )
+  assert_true(no_version.contains("error:missing-document-version:targets.json"))
+  // Per-document findings keep the severity prefix and gain the document name as
+  // a code segment, so the document name follows `error:`.
   assert_true(no_version.contains("error:targets:invalid-version"))
+  // The bundle prefixes each document finding with the document it came from,
+  // so the severity follows that prefix instead of leading the line.
+  assert_true(
+    missing_codes.any(line => line.has_prefix("timestamp:")),
+  )
   let expired = preflight_bundle_report(
     matching, snapshot, targets, "2035-01-01T00:00:00Z",
   ).to_strings()
-  assert_true(expired.contains("error:timestamp:expired:2030-01-01T00:00:00Z"))
-  assert_true(expired.contains("error:snapshot:expired:2030-01-01T00:00:00Z"))
-  assert_true(expired.contains("error:targets:expired:2030-06-01T12:30:00Z"))
+  assert_true(expired.contains("timestamp:error:expired:2030-01-01T00:00:00Z"))
+  assert_true(expired.contains("snapshot:error:expired:2030-01-01T00:00:00Z"))
+  assert_true(expired.contains("targets:error:expired:2030-06-01T12:30:00Z"))
 }
 
 ///|
@@ -570,4 +575,16 @@ test "report accessors expose severity counts" {
   assert_true(report.has_errors())
   assert_eq(report.error_count(), 1)
   assert_eq(report.warning_count(), 1)
+  // Consumers branch on the structured findings, so exercise the accessors
+  // rather than only the rendered strings.
+  let findings = report.findings()
+  assert_eq(findings.length(), 2)
+  let errors = findings.filter(finding => finding.severity() is Error)
+  let warnings = findings.filter(finding => finding.severity() is Warning)
+  assert_eq(errors.length(), 1)
+  assert_eq(errors[0].code(), "unsafe-target-path")
+  assert_eq(errors[0].location(), "../evil")
+  assert_eq(warnings.length(), 1)
+  assert_eq(warnings[0].code(), "non-object-target-custom")
+  assert_eq(warnings[0].location(), "app.bin")
 }

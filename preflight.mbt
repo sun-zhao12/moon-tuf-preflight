@@ -23,6 +23,25 @@ pub struct Finding {
 }
 
 ///|
+/// Whether the finding blocks handing the document to a TUF verifier.
+pub fn Finding::severity(self : Finding) -> Severity {
+  self.severity
+}
+
+///|
+/// The stable machine-readable code, such as `invalid-target-hash`.
+pub fn Finding::code(self : Finding) -> String {
+  self.code
+}
+
+///|
+/// The key id, meta file name, target path or document the finding belongs to,
+/// or the empty string when it applies to the whole envelope.
+pub fn Finding::location(self : Finding) -> String {
+  self.location
+}
+
+///|
 /// The complete preflight result for one metadata document.
 ///
 /// Call [`Report::findings`] for the human-readable diagnostics and
@@ -300,7 +319,8 @@ pub fn preflight_at(
 /// Preflight a `timestamp` / `snapshot` / `targets` triple and check that the
 /// versions the documents reference agree with the versions they carry.
 ///
-/// Findings are prefixed with the document they came from, for example
+/// Findings from a single document gain that document's name as a code
+/// segment, so a timestamp that expired is rendered as
 /// `error:timestamp:expired:2030-01-01T00:00:00Z`. A missing or malformed
 /// `version` on either side of a reference is reported as
 /// `missing-version-reference` or `missing-document-version` instead of being

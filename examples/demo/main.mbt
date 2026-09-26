@@ -11,12 +11,20 @@
 fn main {
   let expired = targets("2024-01-01T00:00:00Z", "../app.bin", "abcd")
   println("== expired, unsafe path and short digest ==")
-  for finding in @tuf.preflight_at(expired, "targets", "2026-09-24T12:00:00Z") {
-    println("- " + finding)
-  }
-  let report = @tuf.preflight_at_report(
+  let expired_report = @tuf.preflight_at_report(
     expired, "targets", "2026-09-24T12:00:00Z",
   )
+  // The rendered form is convenient for logs; the structured accessors are what
+  // a pipeline branches on. Both are shown here so the example exercises the
+  // public API a consumer would actually use.
+  for finding in expired_report.findings() {
+    match finding.severity() {
+      Error => println("error " + finding.code() + " at " + finding.location())
+      Warning => println("warn  " + finding.code() + " at " + finding.location())
+    }
+  }
+  println("rendered:\n" + expired_report.render())
+  let report = expired_report
   println(
     "errors=" +
     report.error_count().to_string() +
