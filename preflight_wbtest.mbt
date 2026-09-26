@@ -1,0 +1,451 @@
+///|
+/// A syntactically valid SHA-256 digest. It is a repeated pattern, not a digest
+/// of any file in this repository.
+let sha256_hex : String = "0123456789abcdef".repeat(4)
+
+///|
+/// A syntactically valid SHA-512 digest, again only structurally meaningful.
+let sha512_hex : String = "0123456789abcdef".repeat(8)
+
+///|
+/// A structurally valid single-signature envelope around `body`, which must be
+/// the JSON text of the `signed` object.
+fn envelope(body : String) -> String {
+  "{\"signed\":" + body + ",\"signatures\":[{\"keyid\":\"k1\",\"sig\":\"s1\"}]}"
+}
+
+///|
+/// Escape `value` so that it can be embedded between two JSON double quotes.
+fn escape_json(value : String) -> String {
+  value
+  .replace_all(old="\\", new="\\\\")
+  .replace_all(old="\"", new="\\\"")
+  .replace_all(old="\n", new="\\n")
+}
+
+///|
+/// A `targets` document containing one well-formed target named `name`, with
+/// `length` bytes and the JSON fragment `hashes` as its `hashes` value.
+fn targets_document(
+  name : String,
+  hashes : String,
+  length? : Double = 1024.0,
+  version? : Int = 3,
+) -> String {
+  envelope(
+    "{\"_type\":\"targets\",\"version\":" +
+    version.to_string() +
+    ",\"expires\":\"2030-06-01T12:30:00Z\",\"targets\":{\"" +
+    escape_json(name) +
+    "\":{\"length\":" +
+    length.to_string() +
+    ",\"hashes\":" +
+    hashes +
+    "}}}",
+  )
+}
+
+///|
+/// The set of finding codes in `report`, with the severity prefix stripped.
+fn codes(report : Report) -> Array[String] {
+  report
+  .to_strings()
+  .map(line => {
+    let parts = line.split(":").to_array().map(part => part.to_owned())
+    if parts.length() >= 2 {
+      parts[1]
+    } else {
+      line
+    }
+  })
+}
+
+///|
+test "well-formed targets metadata has no findings" {
+  let input = targets_document("app.bin", "{\"sha256\":\"" + sha256_hex + "\"}")
+  let report = preflight_report(input, "targets")
+  assert_eq(report.to_strings(), [])
+  assert_true(report.ok())
+  assert_eq(report.error_count(), 0)
+  assert_eq(report.version(), Some(3))
+  assert_eq(report.render(), "ok")
+}
+
+///|
+test "malformed JSON and wrong envelope shapes are reported" {
+  assert_eq(preflight("{", "targets"), ["error:invalid-json"])
+  assert_eq(preflight("[]", "targets"), ["error:envelope-not-object"])
+  assert_eq(preflight("{\"signatures\":[]}", "targets"), [
+    "error:missing-signed-object",
+  ])
+  assert_eq(preflight("{}", "mirror"), ["error:unsupported-role:mirror"])
+}
+
+///|
+test "role, version and expiry fields are validated" {
+  let wrong_role = envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}}",
+  )
+  assert_true(
+    preflight(wrong_role, "targets").contains("error:role-mismatch:targets"),
+  )
+  let bad_version = envelope(
+    "{\"_type\":\"targets\",\"version\":0,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}}",
+  )
+  assert_true(
+    preflight(bad_version, "targets").contains("error:invalid-version"),
+  )
+  let fractional = envelope(
+    "{\"_type\":\"targets\",\"version\":1.5,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}}",
+  )
+  assert_true(
+    preflight(fractional, "targets").contains("error:invalid-version"),
+  )
+  let bad_expires = envelope(
+    "{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-02-29T00:00:00Z\",\"targets\":{}}",
+  )
+  assert_true(
+    preflight(bad_expires, "targets").contains("error:invalid-expires"),
+  )
+  let leap_expires = envelope(
+    "{\"_type\":\"targets\",\"version\":1,\"expires\":\"2032-02-29T00:00:00Z\",\"targets\":{}}",
+  )
+  assert_false(
+    preflight(leap_expires, "targets").contains("error:invalid-expires"),
+  )
+}
+
+///|
+test "signature entries are inspected for shape, not validity" {
+  let no_signatures = "{\"signed\":{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}}}"
+  assert_true(
+    preflight(no_signatures, "targets").contains(
+      "error:missing-signatures-array",
+    ),
+  )
+  let empty_signatures = "{\"signed\":{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}},\"signatures\":[]}"
+  assert_true(
+    preflight(empty_signatures, "targets").contains("error:empty-signatures"),
+  )
+  let broken = "{\"signed\":{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}},\"signatures\":[7,{\"keyid\":\"\",\"sig\":\"\"},{\"keyid\":\"k1\",\"sig\":\"s\"},{\"keyid\":\"k1\",\"sig\":\"s\"}]}"
+  let codes = preflight(broken, "targets")
+  assert_true(codes.contains("error:invalid-signature-entry"))
+  assert_true(codes.contains("error:invalid-signature-keyid"))
+  assert_true(codes.contains("error:invalid-signature-value"))
+  assert_true(codes.contains("error:duplicate-signature-keyid:k1"))
+}
+
+///|
+test "root keys, roles and thresholds are checked" {
+  let key = "\"k1\":{\"keytype\":\"ed25519\",\"scheme\":\"ed25519\",\"keyval\":{\"public\":\"public-bytes\"}}"
+  let role = fn(threshold : Int, keyids : String) {
+    "{\"threshold\":" + threshold.to_string() + ",\"keyids\":" + keyids + "}"
+  }
+  let good = envelope(
+    "{\"_type\":\"root\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"keys\":{" +
+    key +
+    "},\"roles\":{\"root\":" +
+    role(1, "[\"k1\"]") +
+    ",\"timestamp\":" +
+    role(1, "[\"k1\"]") +
+    ",\"snapshot\":" +
+    role(1, "[\"k1\"]") +
+    ",\"targets\":" +
+    role(1, "[\"k1\"]") +
+    "}}",
+  )
+  assert_eq(preflight(good, "root"), [])
+  let unreachable_root = envelope(
+    "{\"_type\":\"root\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"keys\":{\"k1\":{}},\"roles\":{\"root\":" +
+    role(2, "[\"k1\",\"ghost\"]") +
+    "}}",
+  )
+  let report = preflight_report(unreachable_root, "root")
+  assert_true(codes(report).contains("unreachable-threshold"))
+  assert_true(codes(report).contains("unknown-keyid"))
+  assert_true(codes(report).contains("missing-role"))
+  assert_true(codes(report).contains("invalid-keytype"))
+  assert_true(codes(report).contains("invalid-keyval"))
+  assert_true(codes(report).contains("missing-role"))
+  let missing_roles = envelope(
+    "{\"_type\":\"root\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\"}",
+  )
+  assert_true(preflight(missing_roles, "root").contains("error:missing-keys"))
+  let missing_keys = envelope(
+    "{\"_type\":\"root\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"roles\":{}}",
+  )
+  assert_true(preflight(missing_keys, "root").contains("error:missing-keys"))
+  let duplicate = envelope(
+    "{\"_type\":\"root\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"keys\":{" +
+    key +
+    "},\"roles\":{\"root\":" +
+    role(1, "[\"k1\",\"k1\"]") +
+    ",\"timestamp\":" +
+    role(1, "[]") +
+    "}}",
+  )
+  let duplicate_codes = preflight(duplicate, "root")
+  assert_true(duplicate_codes.contains("error:duplicate-keyid:root:k1"))
+  assert_true(duplicate_codes.contains("error:missing-keyids:timestamp"))
+}
+
+///|
+test "timestamp and snapshot meta tables are validated" {
+  let timestamp = envelope(
+    "{\"_type\":\"timestamp\",\"version\":4,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"snapshot.json\":{\"version\":3}}}",
+  )
+  assert_eq(preflight(timestamp, "timestamp"), [])
+  let missing_reference = envelope(
+    "{\"_type\":\"timestamp\",\"version\":4,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"other.json\":{\"version\":1}}}",
+  )
+  assert_true(
+    preflight(missing_reference, "timestamp").contains(
+      "error:missing-meta:snapshot.json",
+    ),
+  )
+  let empty = envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{}}",
+  )
+  let empty_codes = preflight(empty, "snapshot")
+  assert_true(empty_codes.contains("error:empty-meta:snapshot"))
+  assert_true(empty_codes.contains("error:missing-meta:targets.json"))
+  let bad_version = envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"targets.json\":{\"version\":\"1\"}}}",
+  )
+  assert_true(
+    preflight(bad_version, "snapshot").contains(
+      "error:invalid-meta-version:targets.json",
+    ),
+  )
+  let not_object = envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"targets.json\":[]}}",
+  )
+  assert_true(
+    preflight(not_object, "snapshot").contains(
+      "error:invalid-meta-entry:targets.json",
+    ),
+  )
+  let no_meta = envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\"}",
+  )
+  assert_true(
+    preflight(no_meta, "snapshot").contains("error:missing-meta:snapshot"),
+  )
+}
+
+///|
+test "target paths, lengths and digests are validated" {
+  assert_eq(
+    preflight(
+      targets_document("app.bin", "{\"sha256\":\"" + sha256_hex + "\"}"),
+      "targets",
+    ),
+    [],
+  )
+  assert_eq(
+    preflight(
+      targets_document("app.bin", "{\"sha512\":\"" + sha512_hex + "\"}"),
+      "targets",
+    ),
+    [],
+  )
+  for
+    path in [
+      "../app", "/etc/passwd", "a/../b", "a//b", "a/./b", "", "C:\\\\app",
+    ] {
+    let found = preflight(
+      targets_document(path, "{\"sha256\":\"" + sha256_hex + "\"}"),
+      "targets",
+    )
+    // An empty name produces a finding whose location is the empty string, so
+    // the expected text is built from the same values the library reports.
+    let expected = if path == "" {
+      "error:unsafe-target-path"
+    } else {
+      "error:unsafe-target-path:" + path
+    }
+    assert_true(found.contains(expected))
+  }
+  let short_digest = preflight(
+    targets_document("app.bin", "{\"sha256\":\"abc\"}"),
+    "targets",
+  )
+  assert_true(short_digest.contains("error:invalid-target-hash:app.bin:sha256"))
+  let non_hex = preflight(
+    targets_document("app.bin", "{\"sha256\":\"" + "z".repeat(64) + "\"}"),
+    "targets",
+  )
+  assert_true(non_hex.contains("error:invalid-target-hash:app.bin:sha256"))
+  let unknown_algorithm = preflight(
+    targets_document("app.bin", "{\"md5\":\"abc\"}"),
+    "targets",
+  )
+  assert_true(
+    unknown_algorithm.contains(
+      "warning:unsupported-target-hash-algorithm:app.bin:md5",
+    ),
+  )
+  let no_hashes = preflight(targets_document("app.bin", "{}"), "targets")
+  assert_true(no_hashes.contains("error:missing-target-hashes:app.bin"))
+  let negative = targets_document(
+    "app.bin",
+    "{\"sha256\":\"" + sha256_hex + "\"}",
+    length=-1.0,
+  )
+  assert_true(
+    preflight(negative, "targets").contains(
+      "error:invalid-target-length:app.bin",
+    ),
+  )
+  let fractional = targets_document(
+    "app.bin",
+    "{\"sha256\":\"" + sha256_hex + "\"}",
+    length=1.5,
+  )
+  assert_true(
+    preflight(fractional, "targets").contains(
+      "error:invalid-target-length:app.bin",
+    ),
+  )
+  let bad_entry = envelope(
+    "{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{\"app.bin\":4}}",
+  )
+  assert_true(
+    preflight(bad_entry, "targets").contains(
+      "error:invalid-target-entry:app.bin",
+    ),
+  )
+  let warning = envelope(
+    "{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{\"app.bin\":{\"length\":1,\"hashes\":{\"sha256\":\"" +
+    sha256_hex +
+    "\"},\"custom\":7}}}",
+  )
+  let warning_report = preflight_report(warning, "targets")
+  assert_true(
+    warning_report
+    .to_strings()
+    .contains("warning:non-object-target-custom:app.bin"),
+  )
+  assert_eq(warning_report.warning_count(), 1)
+  assert_eq(warning_report.error_count(), 0)
+}
+
+///|
+test "expiry is decided by the caller-supplied clock" {
+  let input = targets_document("app.bin", "{\"sha256\":\"" + sha256_hex + "\"}")
+  assert_false(
+    preflight_at(input, "targets", "2029-01-01T00:00:00Z").contains(
+      "error:expired:2030-06-01T12:30:00Z",
+    ),
+  )
+  assert_false(
+    preflight_at(input, "targets", "2030-06-01T12:29:59Z").contains(
+      "error:expired:2030-06-01T12:30:00Z",
+    ),
+  )
+  assert_true(
+    preflight_at(input, "targets", "2030-06-01T12:30:00Z").contains(
+      "error:expired:2030-06-01T12:30:00Z",
+    ),
+  )
+  assert_true(
+    preflight_at(input, "targets", "2031-01-01T00:00:00Z").contains(
+      "error:expired:2030-06-01T12:30:00Z",
+    ),
+  )
+  assert_true(
+    preflight_at(input, "targets", "yesterday").contains(
+      "error:invalid-current-time",
+    ),
+  )
+}
+
+///|
+test "bundle checks reference versions in both directions" {
+  let timestamp = envelope(
+    "{\"_type\":\"timestamp\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"snapshot.json\":{\"version\":2}}}",
+  )
+  let snapshot = envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"targets.json\":{\"version\":1}}}",
+  )
+  let targets = targets_document(
+    "app.bin",
+    "{\"sha256\":\"" + sha256_hex + "\"}",
+  )
+  let report = preflight_bundle_report(
+    timestamp, snapshot, targets, "2026-09-24T00:00:00Z",
+  )
+  assert_true(
+    report
+    .to_strings()
+    .contains(
+      "error:snapshot-version-mismatch:snapshot.json:referenced=2,actual=1",
+    ),
+  )
+  // `snapshot` references `targets.json` version 1, but the targets document
+  // carries version 3, so both mismatches must be reported independently.
+  assert_true(
+    report
+    .to_strings()
+    .contains(
+      "error:targets-version-mismatch:targets.json:referenced=1,actual=3",
+    ),
+  )
+  let matching = envelope(
+    "{\"_type\":\"timestamp\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"snapshot.json\":{\"version\":1}}}",
+  )
+  let matching_snapshot = envelope(
+    "{\"_type\":\"snapshot\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{\"targets.json\":{\"version\":3}}}",
+  )
+  assert_eq(
+    preflight_bundle_report(
+      matching, matching_snapshot, targets, "2026-09-24T00:00:00Z",
+    ).to_strings(),
+    [],
+  )
+  let no_reference = envelope(
+    "{\"_type\":\"timestamp\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"meta\":{}}",
+  )
+  let missing_codes = preflight_bundle_report(
+    no_reference, snapshot, targets, "2026-09-24T00:00:00Z",
+  ).to_strings()
+  assert_true(
+    missing_codes.contains(
+      "error:missing-version-reference:timestamp->snapshot.json",
+    ),
+  )
+  let undated_targets = envelope(
+    "{\"_type\":\"targets\",\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{}}",
+  )
+  let no_version = preflight_bundle_report(
+    matching, snapshot, undated_targets, "2026-09-24T00:00:00Z",
+  ).to_strings()
+  assert_true(
+    no_version.contains("error:missing-document-version:targets.json"),
+  )
+  assert_true(no_version.contains("error:targets:invalid-version"))
+  let expired = preflight_bundle_report(
+    matching, snapshot, targets, "2035-01-01T00:00:00Z",
+  ).to_strings()
+  assert_true(expired.contains("error:timestamp:expired:2030-01-01T00:00:00Z"))
+  assert_true(expired.contains("error:snapshot:expired:2030-01-01T00:00:00Z"))
+  assert_true(expired.contains("error:targets:expired:2030-06-01T12:30:00Z"))
+}
+
+///|
+test "report accessors expose severity counts" {
+  let input = envelope(
+    "{\"_type\":\"targets\",\"version\":1,\"expires\":\"2030-01-01T00:00:00Z\",\"targets\":{\"app.bin\":{\"length\":1,\"hashes\":{\"sha256\":\"" +
+    sha256_hex +
+    "\"},\"custom\":7},\"../evil\":{\"length\":1,\"hashes\":{\"sha256\":\"" +
+    sha256_hex +
+    "\"}}}}",
+  )
+  let report = preflight_report(input, "targets")
+  assert_eq(report.role(), "targets")
+  assert_eq(report.version(), Some(1))
+  assert_false(report.ok())
+  assert_true(report.has_errors())
+  assert_eq(report.error_count(), 1)
+  assert_eq(report.warning_count(), 1)
+}

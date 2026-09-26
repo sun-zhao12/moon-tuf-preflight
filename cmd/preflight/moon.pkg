@@ -1,0 +1,6 @@
+import {
+  "sun-zhao12/moon-tuf-preflight",
+  "moonbitlang/core/argparse",
+}
+
+pkgtype(kind: "executable")

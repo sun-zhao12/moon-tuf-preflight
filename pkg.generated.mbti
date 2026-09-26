@@ -1,0 +1,50 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "sun-zhao12/moon-tuf-preflight"
+
+// Values
+pub fn preflight(String, String) -> Array[String]
+
+pub fn preflight_at(String, String, String) -> Array[String]
+
+pub fn preflight_at_report(String, String, String) -> Report
+
+pub fn preflight_bundle(String, String, String, String) -> Array[String]
+
+pub fn preflight_bundle_report(String, String, String, String) -> Report
+
+pub fn preflight_report(String, String) -> Report
+
+// Errors
+
+// Types and methods
+pub struct Finding {
+  severity : Severity
+  code : String
+  location : String
+}
+pub fn Finding::to_string(Self) -> String
+
+pub struct Report {
+  findings : Array[Finding]
+  role : String
+  version : Int?
+}
+pub fn Report::error_count(Self) -> Int
+pub fn Report::findings(Self) -> Array[Finding]
+pub fn Report::has_errors(Self) -> Bool
+pub fn Report::ok(Self) -> Bool
+pub fn Report::render(Self) -> String
+pub fn Report::role(Self) -> String
+pub fn Report::to_strings(Self) -> Array[String]
+pub fn Report::version(Self) -> Int?
+pub fn Report::warning_count(Self) -> Int
+
+pub enum Severity {
+  Error
+  Warning
+}
+pub fn Severity::to_string(Self) -> String
+
+// Type aliases
+
+// Traits

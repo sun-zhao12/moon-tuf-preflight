@@ -1,0 +1,5 @@
+import {
+  "sun-zhao12/moon-tuf-preflight" @tuf,
+}
+
+pkgtype(kind: "executable")
