@@ -20,7 +20,8 @@ fn main {
   for finding in expired_report.findings() {
     match finding.severity() {
       Error => println("error " + finding.code() + " at " + finding.location())
-      Warning => println("warn  " + finding.code() + " at " + finding.location())
+      Warning =>
+        println("warn  " + finding.code() + " at " + finding.location())
     }
   }
   println("rendered:\n" + expired_report.render())

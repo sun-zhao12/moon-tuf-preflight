@@ -22,6 +22,9 @@ pub struct Finding {
   code : String
   location : String
 }
+pub fn Finding::code(Self) -> String
+pub fn Finding::location(Self) -> String
+pub fn Finding::severity(Self) -> Severity
 pub fn Finding::to_string(Self) -> String
 
 pub struct Report {

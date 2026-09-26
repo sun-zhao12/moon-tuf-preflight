@@ -542,21 +542,19 @@ test "bundle checks reference versions in both directions" {
   let no_version = preflight_bundle_report(
     matching, snapshot, undated_targets, "2026-09-24T00:00:00Z",
   ).to_strings()
-  assert_true(no_version.contains("error:missing-document-version:targets.json"))
+  assert_true(
+    no_version.contains("error:missing-document-version:targets.json"),
+  )
   // Per-document findings keep the severity prefix and gain the document name as
   // a code segment, so the document name follows `error:`.
   assert_true(no_version.contains("error:targets:invalid-version"))
-  // The bundle prefixes each document finding with the document it came from,
-  // so the severity follows that prefix instead of leading the line.
-  assert_true(
-    missing_codes.any(line => line.has_prefix("timestamp:")),
-  )
+  assert_true(missing_codes.any(line => line.has_prefix("error:timestamp:")))
   let expired = preflight_bundle_report(
     matching, snapshot, targets, "2035-01-01T00:00:00Z",
   ).to_strings()
-  assert_true(expired.contains("timestamp:error:expired:2030-01-01T00:00:00Z"))
-  assert_true(expired.contains("snapshot:error:expired:2030-01-01T00:00:00Z"))
-  assert_true(expired.contains("targets:error:expired:2030-06-01T12:30:00Z"))
+  assert_true(expired.contains("error:timestamp:expired:2030-01-01T00:00:00Z"))
+  assert_true(expired.contains("error:snapshot:expired:2030-01-01T00:00:00Z"))
+  assert_true(expired.contains("error:targets:expired:2030-06-01T12:30:00Z"))
 }
 
 ///|
