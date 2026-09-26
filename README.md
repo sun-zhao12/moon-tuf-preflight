@@ -87,4 +87,4 @@ Swap `wasm` for `wasm-gc`, `js` (needs Node.js) or `native` (needs a C compiler)
 
 ## License and sources
 
-The implementation follows the public [TUF specification](https://theupdateframework.github.io/specification/latest/) for field names, role semantics and threshold rules. No third-party source, test vector or data file was copied; all example signatures and digests are placeholders. Licensed under [MIT](LICENSE).
+The implementation follows the public [TUF specification](https://theupdateframework.github.io/specification/latest/) for field names, role semantics and threshold rules. That specification is published under the Community Specification License 1.0 (its license text under CC-BY-4.0); this project only references its semantics, so it is licensed under [MIT](LICENSE). No third-party source, test vector or data file was copied, and all example signatures and digests are placeholders that prove nothing about trust.
