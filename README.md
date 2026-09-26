@@ -6,6 +6,8 @@ It answers one question before anything reaches a real TUF verifier: **is this m
 
 > **Security boundary.** These functions never verify a cryptographic signature, never compare a digest against downloaded bytes, never build a trusted root chain and never prevent rollback. A report with no findings means "this document is well formed", not "this update is safe". Findings must not be used as the authorization to install an update.
 
+Release history is in [CHANGELOG.md](CHANGELOG.md).
+
 ## Use as a library
 
 ```moonbit
@@ -152,6 +154,35 @@ moon run --target wasm examples/demo
 ```
 
 Swap `wasm` for `wasm-gc`, `js` (needs Node.js) or `native` (needs a C compiler). CI runs the check, build and test steps for `wasm`, `wasm-gc`, `js` and `native`, runs the example, and verifies that `moon fmt` and `moon info` leave the tree unchanged.
+
+To use the published package instead of this checkout:
+
+```sh
+moon add sun-zhao12/moon-tuf-preflight
+```
+
+## Using it as a pipeline gate
+
+The two severities have different meanings, and a gate should treat them differently:
+
+- `Error` means the document is structurally unusable for the role: a verifier would reject it or, worse, accept an envelope the caller misread. Fail the build.
+- `Warning` means the document parses but carries something this preflight cannot confirm, such as an unfamiliar digest algorithm or a missing `spec_version`. Report it; do not fail by default.
+
+`Report::has_errors()` answers the gate question, while `Report::ok()` is true for warnings-only reports. A minimal gate:
+
+```sh
+findings=$(moon run --target wasm-gc cmd/preflight -- --role targets "$(cat targets.json)" || true)
+if printf '%s' "$findings" | grep -q '^error:'; then
+  printf '%s\n' "$findings"
+  exit 1
+fi
+```
+
+Because the current time is an argument, a repository schedule can re-run the expiry check on a cron without any hidden clock read:
+
+```sh
+moon run --target wasm-gc cmd/preflight -- --role timestamp --at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(cat timestamp.json)"
+```
 
 ## What it does not do
 
