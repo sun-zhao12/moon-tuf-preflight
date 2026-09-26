@@ -249,6 +249,27 @@ test "target paths, lengths and digests are validated" {
     ),
     [],
   )
+  // The TUF specification also names the SHA-3 family, so those algorithms must
+  // be checked for length instead of being reported as unsupported.
+  assert_eq(
+    preflight(
+      targets_document("app.bin", "{\"sha3-256\":\"" + sha256_hex + "\"}"),
+      "targets",
+    ),
+    [],
+  )
+  assert_eq(
+    preflight(
+      targets_document("app.bin", "{\"sha3-512\":\"" + sha512_hex + "\"}"),
+      "targets",
+    ),
+    [],
+  )
+  let short_sha3 = preflight(
+    targets_document("app.bin", "{\"sha3-256\":\"" + sha512_hex + "\"}"),
+    "targets",
+  )
+  assert_true(short_sha3.contains("error:invalid-target-hash:app.bin:sha3-256"))
   for
     path in [
       "../app", "/etc/passwd", "a/../b", "a//b", "a/./b", "", "C:\\\\app",

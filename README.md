@@ -51,7 +51,7 @@ Findings are stable strings of the form `severity:code[:location]`, where `sever
 | `error:unreachable-threshold:root:threshold=2,usable=1` | fewer usable keys than the threshold |
 | `error:unsafe-target-path:../app` | absolute, `..`, `.`, empty or backslash/colon path |
 | `error:invalid-target-hash:app.bin:sha256` | digest is not hex or not the expected length |
-| `warning:unsupported-target-hash-algorithm:app.bin:md5` | digest algorithm is not `sha256`/`sha512` |
+| `warning:unsupported-target-hash-algorithm:app.bin:md5` | digest algorithm is not `sha256`, `sha3-256`, `sha512` or `sha3-512` |
 | `error:snapshot-version-mismatch:snapshot.json:referenced=2,actual=1` | bundle version disagreement |
 
 Inputs must use second-resolution UTC with a trailing `Z`. Digest checks cover hex characters and digest length only; no file is read. The current time is always a parameter, so CI, Wasm and offline runs reproduce identical output.

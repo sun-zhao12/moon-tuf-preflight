@@ -692,8 +692,9 @@ fn check_meta(
 /// `..`, `.` and backslashes, every target has a non-negative integer `length`
 /// and a non-empty `hashes` map whose digests match the declared algorithm.
 ///
-/// Digest checks cover hex characters and length for `sha256` and `sha512`.
-/// No file content is read, so a well-formed digest is never a content check.
+/// Digest checks cover hex characters and length for `sha256`, `sha3-256`,
+/// `sha512` and `sha3-512`. No file content is read, so a well-formed digest is
+/// never a content check.
 fn check_targets(signed : Map[String, Json], findings : Array[Finding]) -> Unit {
   let targets = match signed.get("targets") {
     Some(Object(targets)) => targets
@@ -767,6 +768,11 @@ fn check_targets(signed : Map[String, Json], findings : Array[Finding]) -> Unit 
 
 ///|
 /// Check one `algorithm: digest` pair of a target's `hashes` map.
+///
+/// Supported digest lengths follow the TUF specification's hash function list.
+/// An unknown algorithm is a warning rather than an error because the
+/// specification allows repositories to publish additional hash functions; the
+/// preflight simply cannot confirm their digest length.
 fn check_target_hash(
   name : String,
   algorithm : String,
@@ -786,8 +792,8 @@ fn check_target_hash(
     }
   }
   let expected = match algorithm {
-    "sha256" => 64
-    "sha512" => 128
+    "sha256" | "sha3-256" => 64
+    "sha512" | "sha3-512" => 128
     _ => {
       findings.push(Finding::{
         severity: Warning,
