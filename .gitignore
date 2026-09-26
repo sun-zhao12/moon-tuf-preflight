@@ -1,3 +1,6 @@
 /_build/
 /.mooncakes/
 *.log
+
+# Contest submission document: kept in the working copy, never published.
+/申报书.md
