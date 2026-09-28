@@ -192,9 +192,9 @@ test "an unusable role makes the verdict undecidable" {
   let findings = empty_findings()
   authorization_findings(authorization, no_roles, findings)
   assert_true(
-    findings.map(finding => finding.to_string()).contains(
-      "error:unverifiable-role:root",
-    ),
+    findings
+    .map(finding => finding.to_string())
+    .contains("error:unverifiable-role:root"),
   )
   // The same for a role the root does not define.
   let root = uniform_root(1, "k1", 1)
@@ -254,9 +254,9 @@ test "a rotation must satisfy the previous root threshold" {
   let findings = empty_findings()
   check_root_chain([stricter, one_signature], findings)
   assert_true(
-    findings.map(finding => finding.to_string()).contains(
-      "error:insufficient-signatures:root:1/2",
-    ),
+    findings
+    .map(finding => finding.to_string())
+    .contains("error:insufficient-signatures:root:1/2"),
   )
   // Raising the new root's own threshold does not break the rotation: the client
   // authorizes the update with the previous root's role, so the verdict stays
@@ -274,26 +274,26 @@ test "root versions in a chain must be consecutive" {
   let findings = empty_findings()
   check_root_chain([first, third], findings)
   assert_true(
-    findings.map(finding => finding.to_string()).contains(
-      "error:non-consecutive-root-version:root[1]:expected=2,actual=3",
-    ),
+    findings
+    .map(finding => finding.to_string())
+    .contains("error:non-consecutive-root-version:root[1]:expected=2,actual=3"),
   )
   // A repeated version is not an increment either.
   let repeat = empty_findings()
   check_root_chain([first, first], repeat)
   assert_true(
-    repeat.map(finding => finding.to_string()).contains(
-      "error:non-consecutive-root-version:root[1]:expected=2,actual=1",
-    ),
+    repeat
+    .map(finding => finding.to_string())
+    .contains("error:non-consecutive-root-version:root[1]:expected=2,actual=1"),
   )
   // A document with no usable version is reported against its own index.
   let undated = "{\"signed\":{\"spec_version\":\"1.0.31\",\"_type\":\"root\",\"expires\":\"2030-01-01T00:00:00Z\",\"keys\":{},\"roles\":{}},\"signatures\":[{\"keyid\":\"k1\",\"sig\":\"s\"}]}"
   let missing = empty_findings()
   check_root_chain([first, undated], missing)
   assert_true(
-    missing.map(finding => finding.to_string()).contains(
-      "error:missing-root-version:root[1]",
-    ),
+    missing
+    .map(finding => finding.to_string())
+    .contains("error:missing-root-version:root[1]"),
   )
 }
 
@@ -306,10 +306,9 @@ test "a single root chain only checks its own role" {
   // An empty chain is a misuse, not a valid rotation.
   let empty = empty_findings()
   check_root_chain([], empty)
-  assert_eq(
-    empty.map(finding => finding.to_string()),
-    ["error:empty-root-chain"],
-  )
+  assert_eq(empty.map(finding => finding.to_string()), [
+    "error:empty-root-chain",
+  ])
 }
 
 ///|

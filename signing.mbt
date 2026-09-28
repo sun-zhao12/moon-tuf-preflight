@@ -74,10 +74,7 @@ pub fn signature_values(input : String) -> Array[String] {
     match signature {
       Object(entry) =>
         match entry.get("sig") {
-          Some(String(value)) =>
-            if value != "" {
-              values.push(value)
-            }
+          Some(String(value)) => if value != "" { values.push(value) }
           _ => ()
         }
       _ => ()
@@ -172,8 +169,9 @@ pub fn AuthorizationOutcome::equal(
   other : AuthorizationOutcome,
 ) -> Bool {
   match (self, other) {
-    (Satisfied, Satisfied) | (Unsatisfied, Unsatisfied) |
-    (Undecidable, Undecidable) => true
+    (Satisfied, Satisfied)
+    | (Unsatisfied, Unsatisfied)
+    | (Undecidable, Undecidable) => true
     _ => false
   }
 }
@@ -385,11 +383,12 @@ pub fn authorization_findings(
     Some(keyids) => keyids
     None => []
   }
-  for keyid in unexpected_signers(
-    authorization.keyids,
-    authorization.authorized_keyids,
-    own_keyids,
-  ) {
+  for
+    keyid in unexpected_signers(
+      authorization.keyids,
+      authorization.authorized_keyids,
+      own_keyids,
+    ) {
     findings.push(Finding::{
       severity: Warning,
       code: "unexpected-signer:" + role,
@@ -505,5 +504,5 @@ pub fn check_root_chain(
 pub fn preflight_root_chain(chain : ArrayView[String]) -> Array[String] {
   let findings : Array[Finding] = []
   check_root_chain(chain, findings)
-  Report::{ findings, role: "root-chain", version: None }.to_strings()
+  Report::{ findings, role: "root-chain", version: None, }.to_strings()
 }
