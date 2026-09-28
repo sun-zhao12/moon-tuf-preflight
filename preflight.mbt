@@ -557,6 +557,10 @@ fn check_signatures(
 ///
 /// A role is unusable when its threshold exceeds the number of *distinct* key
 /// ids that exist in `keys`, which is reported as `unreachable-threshold`.
+///
+/// A missing `keys` or `roles` table is reported and then treated as empty, so a
+/// document that lacks both gets both findings instead of only the first one.
+/// Diagnosing one problem per run is not useful for a release check.
 fn check_root(signed : Map[String, Json], findings : Array[Finding]) -> Unit {
   let keys = match signed.get("keys") {
     Some(Object(keys)) => keys
@@ -566,7 +570,7 @@ fn check_root(signed : Map[String, Json], findings : Array[Finding]) -> Unit {
         code: "missing-keys",
         location: "",
       })
-      return
+      Map([])
     }
   }
   let roles = match signed.get("roles") {
@@ -577,7 +581,7 @@ fn check_root(signed : Map[String, Json], findings : Array[Finding]) -> Unit {
         code: "missing-roles",
         location: "",
       })
-      return
+      Map([])
     }
   }
   for entry in keys.iter() {
