@@ -2,11 +2,27 @@
 package "sun-zhao12/moon-tuf-preflight"
 
 // Values
+pub fn compare_date_time(DateTime, DateTime) -> Int
+
 pub fn compare_ordinal(StringView, StringView) -> Int
+
+pub fn days_from_civil(Int, Int, Int) -> Int64
+
+pub fn days_in_month(Int, Int) -> Int
 
 pub fn finding_codes() -> Array[String]
 
+pub fn is_compatible_spec_version(Semver, Semver) -> Bool
+
+pub fn is_date_time(String) -> Bool
+
+pub fn is_leap_year(Int) -> Bool
+
 pub fn is_sorted_ordinal(ArrayView[String]) -> Bool
+
+pub fn parse_date_time(String) -> DateTime?
+
+pub fn parse_semver(String) -> Semver?
 
 pub fn preflight(String, String) -> Array[String]
 
@@ -20,9 +36,30 @@ pub fn preflight_bundle_report(String, String, String, String) -> Report
 
 pub fn preflight_report(String, String) -> Report
 
+pub fn seconds_between(DateTime, DateTime) -> Int64
+
 // Errors
 
 // Types and methods
+pub struct DateTime {
+  epoch_seconds : Int64
+  form : DateTimeForm
+  offset_minutes : Int
+}
+pub fn DateTime::epoch_seconds(Self) -> Int64
+pub fn DateTime::equal(Self, Self) -> Bool
+pub fn DateTime::form(Self) -> DateTimeForm
+pub fn DateTime::is_canonical(Self) -> Bool
+pub fn DateTime::offset_minutes(Self) -> Int
+
+pub enum DateTimeForm {
+  Exact
+  Fractional
+  Offset
+}
+pub fn DateTimeForm::equal(Self, Self) -> Bool
+pub fn DateTimeForm::to_string(Self) -> String
+
 pub struct Finding {
   severity : Severity
   code : String
@@ -47,6 +84,20 @@ pub fn Report::role(Self) -> String
 pub fn Report::to_strings(Self) -> Array[String]
 pub fn Report::version(Self) -> Int?
 pub fn Report::warning_count(Self) -> Int
+
+pub struct Semver {
+  major : Int
+  minor : Int
+  patch : Int
+  suffix : String
+}
+pub fn Semver::equal(Self, Self) -> Bool
+pub fn Semver::is_plain(Self) -> Bool
+pub fn Semver::major(Self) -> Int
+pub fn Semver::minor(Self) -> Int
+pub fn Semver::patch(Self) -> Int
+pub fn Semver::suffix(Self) -> String
+pub fn Semver::to_string(Self) -> String
 
 pub enum Severity {
   Error
