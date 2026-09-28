@@ -4,6 +4,45 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-09-26
+
+### Added
+
+- A date-time layer (`parse_date_time`, `DateTime`, `DateTimeForm`) that reads
+  the specification's exact `YYYY-MM-DDTHH:MM:SSZ` form, accepts fractional
+  seconds and numeric UTC offsets while marking them non-canonical, applies the
+  Gregorian century rule, and converts instants to seconds since the epoch so
+  expiry comparisons are exact rather than lexicographic.
+- A semantic-version layer (`parse_semver`, `Semver`,
+  `is_compatible_spec_version`) for the `spec_version` field.
+- Signature authorization (`signature_keyids`, `signature_values`,
+  `check_authorization`, `Authorization`, `count_authorized`,
+  `unexpected_signers`, `authorized_keyids`, `role_threshold`): how many
+  distinct authorized keys signed, whether that meets the role threshold, and
+  which signers belong to neither the previous root nor the document's own role.
+- Root rotation chains (`check_root_chain`, `preflight_root_chain`,
+  `chain_versions`, `chain_signers`) requiring consecutive versions and
+  authorization by the immediate predecessor.
+- Delegation checks (`parse_delegations`, `check_delegations`, `path_matches`,
+  `is_hex_prefix`, `check_delegation_tree`, `reachable_roles`): unknown
+  delegation keys, unreachable thresholds, delegations without paths, duplicate
+  role names, malformed path-hash prefixes, suspicious globs and cycles.
+- Snapshot coverage (`check_snapshot_coverage`): a snapshot is compared against
+  the targets documents the caller supplied, in both directions.
+- `empty_findings()`, the shared constructor for a findings buffer.
+
+### Fixed
+
+- A `root` document missing both `keys` and `roles` reported only the first
+  problem, because the validator returned early; every missing table and every
+  missing top-level role is now reported in one pass.
+
+### Changed
+
+- `unexpected_signers` takes the document's own role key ids as a third
+  argument, so a rotation signed by both the old and the new key is not reported
+  as carrying an unexpected signer.
+
 ## [0.1.1] - 2026-09-26
 
 ### Added
