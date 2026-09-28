@@ -2,6 +2,8 @@
 package "sun-zhao12/moon-tuf-preflight"
 
 // Values
+pub fn any_path_matches(Array[String], String) -> Bool
+
 pub fn authorization_findings(Authorization, String, Array[Finding]) -> Unit
 
 pub fn authorized_keyids(String, String) -> Array[String]?
@@ -12,7 +14,13 @@ pub fn chain_versions(ArrayView[String]) -> Array[Int?]
 
 pub fn check_authorization(String, String, String) -> Authorization
 
+pub fn check_delegation_tree(Map[String, String], Array[Finding]) -> Unit
+
+pub fn check_delegations(String, Array[Finding]) -> Unit
+
 pub fn check_root_chain(ArrayView[String], Array[Finding]) -> Unit
+
+pub fn check_snapshot_coverage(String, Map[String, Int], Array[Finding]) -> Unit
 
 pub fn compare_date_time(DateTime, DateTime) -> Int
 
@@ -26,7 +34,11 @@ pub fn days_from_civil(Int, Int, Int) -> Int64
 
 pub fn days_in_month(Int, Int) -> Int
 
+pub fn delegation_edges(String) -> Map[String, Array[String]]
+
 pub fn distinct(Array[String]) -> Array[String]
+
+pub fn empty_findings() -> Array[Finding]
 
 pub fn finding_codes() -> Array[String]
 
@@ -34,13 +46,19 @@ pub fn is_compatible_spec_version(Semver, Semver) -> Bool
 
 pub fn is_date_time(String) -> Bool
 
+pub fn is_hex_prefix(String, String) -> Bool
+
 pub fn is_leap_year(Int) -> Bool
 
 pub fn is_sorted_ordinal(ArrayView[String]) -> Bool
 
 pub fn parse_date_time(String) -> DateTime?
 
+pub fn parse_delegations(String) -> Array[Delegation]?
+
 pub fn parse_semver(String) -> Semver?
+
+pub fn path_matches(String, String) -> Bool
 
 pub fn preflight(String, String) -> Array[String]
 
@@ -52,9 +70,15 @@ pub fn preflight_bundle(String, String, String, String) -> Array[String]
 
 pub fn preflight_bundle_report(String, String, String, String) -> Report
 
+pub fn preflight_delegations(String) -> Array[String]
+
 pub fn preflight_report(String, String) -> Report
 
 pub fn preflight_root_chain(ArrayView[String]) -> Array[String]
+
+pub fn preflight_snapshot_coverage(String, Map[String, Int]) -> Array[String]
+
+pub fn reachable_roles(String, Map[String, Array[String]]) -> Array[String]
 
 pub fn role_threshold(String, String) -> Int?
 
@@ -110,6 +134,23 @@ pub enum DateTimeForm {
 }
 pub fn DateTimeForm::equal(Self, Self) -> Bool
 pub fn DateTimeForm::to_string(Self) -> String
+
+pub struct Delegation {
+  name : String
+  keyids : Array[String]
+  threshold : Int
+  paths : Array[String]
+  path_hash_prefixes : Array[String]
+  terminating : Bool
+  well_formed : Bool
+}
+pub fn Delegation::is_well_formed(Self) -> Bool
+pub fn Delegation::keyids(Self) -> Array[String]
+pub fn Delegation::name(Self) -> String
+pub fn Delegation::path_hash_prefixes(Self) -> Array[String]
+pub fn Delegation::paths(Self) -> Array[String]
+pub fn Delegation::terminating(Self) -> Bool
+pub fn Delegation::threshold(Self) -> Int
 
 pub struct Finding {
   severity : Severity

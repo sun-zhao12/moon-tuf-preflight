@@ -63,14 +63,16 @@ fn delegation_value(
 fn keys_value(keyids : Array[String]) -> Json {
   let pairs : Array[(String, Json)] = []
   for keyid in keyids {
-    pairs.push((
-      keyid,
-      jo([
-        ("keytype", js("ed25519")),
-        ("scheme", js("ed25519")),
-        ("keyval", jo([("public", js("public-" + keyid))])),
-      ]),
-    ))
+    pairs.push(
+      (
+        keyid,
+        jo([
+          ("keytype", js("ed25519")),
+          ("scheme", js("ed25519")),
+          ("keyval", jo([("public", js("public-" + keyid))])),
+        ]),
+      ),
+    )
   }
   jo(pairs)
 }
@@ -92,10 +94,7 @@ fn delegation_document(
     ("delegations", jo([("roles", ja(roles))])),
   ])
   let signature = jo([("keyid", js("k1")), ("sig", js("placeholder"))])
-  jo([
-    ("signed", signed),
-    ("signatures", ja([signature])),
-  ]).stringify()
+  jo([("signed", signed), ("signatures", ja([signature]))]).stringify()
 }
 
 ///|
@@ -164,16 +163,12 @@ test "hex prefixes are checked as prefixes" {
 
 ///|
 test "well-formed delegations parse into typed entries" {
-  let document = delegation_document(
-    "targets",
-    ["k1", "k2"],
-    [delegation_value("role1", ["k1", "k2"], 2, ["apps/*"])],
-  )
+  let document = delegation_document("targets", ["k1", "k2"], [
+    delegation_value("role1", ["k1", "k2"], 2, ["apps/*"]),
+  ])
   let delegations = match parse_delegations(document) {
     Some(delegations) => delegations
-    None => {
-      fail("delegations did not parse")
-    }
+    None => fail("delegations did not parse")
   }
   assert_eq(delegations.length(), 1)
   let entry = delegations[0]
@@ -206,9 +201,7 @@ test "malformed delegations are reported by index" {
   ]).stringify()
   let delegations = match parse_delegations(document) {
     Some(delegations) => delegations
-    None => {
-      fail("delegations did not parse")
-    }
+    None => fail("delegations did not parse")
   }
   assert_eq(delegations.length(), 2)
   assert_false(delegations[0].is_well_formed())
@@ -222,11 +215,9 @@ test "malformed delegations are reported by index" {
 
 ///|
 test "delegation key ids must exist in the document keys" {
-  let document = delegation_document(
-    "targets",
-    ["k1"],
-    [delegation_value("role1", ["k1", "ghost"], 2, ["apps/*"])],
-  )
+  let document = delegation_document("targets", ["k1"], [
+    delegation_value("role1", ["k1", "ghost"], 2, ["apps/*"]),
+  ])
   let findings = empty_findings()
   check_delegations(document, findings)
   let codes = findings.map(finding => finding.to_string())
@@ -243,14 +234,10 @@ test "delegation key ids must exist in the document keys" {
 
 ///|
 test "a delegation without paths would authorize everything" {
-  let document = delegation_document(
-    "targets",
-    ["k1"],
-    [
-      delegation_value("role1", ["k1"], 1, []),
-      delegation_value("role2", ["k1"], 1, ["../escape/*"]),
-    ],
-  )
+  let document = delegation_document("targets", ["k1"], [
+    delegation_value("role1", ["k1"], 1, []),
+    delegation_value("role2", ["k1"], 1, ["../escape/*"]),
+  ])
   let findings = empty_findings()
   check_delegations(document, findings)
   let codes = findings.map(finding => finding.to_string())
@@ -274,14 +261,10 @@ test "duplicate delegations and bad hash prefixes are reported" {
       ("path_hash_prefixes", ja(values)),
     ])
   }
-  let document = delegation_document(
-    "targets",
-    ["k1"],
-    [
-      with_prefixes("role1", ["abc", "zz"]),
-      with_prefixes("role1", ["abc"]),
-    ],
-  )
+  let document = delegation_document("targets", ["k1"], [
+    with_prefixes("role1", ["abc", "zz"]),
+    with_prefixes("role1", ["abc"]),
+  ])
   let findings = empty_findings()
   check_delegations(document, findings)
   let codes = findings.map(finding => finding.to_string())
@@ -291,11 +274,9 @@ test "duplicate delegations and bad hash prefixes are reported" {
 
 ///|
 test "a clean delegation tree reports nothing" {
-  let document = delegation_document(
-    "targets",
-    ["k1"],
-    [delegation_value("role1", ["k1"], 1, ["apps/*"])],
-  )
+  let document = delegation_document("targets", ["k1"], [
+    delegation_value("role1", ["k1"], 1, ["apps/*"]),
+  ])
   let findings = empty_findings()
   check_delegations(document, findings)
   assert_eq(findings.map(finding => finding.to_string()), [])
@@ -315,11 +296,9 @@ test "reachable roles are computed without looping on cycles" {
 
 ///|
 test "delegation edges map a role to its children" {
-  let document = delegation_document(
-    "role1",
-    ["k1"],
-    [delegation_value("role2", ["k1"], 1, ["*"])],
-  )
+  let document = delegation_document("role1", ["k1"], [
+    delegation_value("role2", ["k1"], 1, ["*"]),
+  ])
   let edges = delegation_edges(document)
   assert_eq(edges.get("role1"), Some(["role2"]))
   assert_eq(delegation_edges("{").length(), 0)
@@ -329,16 +308,12 @@ test "delegation edges map a role to its children" {
 test "a delegation tree reports missing metadata and cycles" {
   // `role1` delegates back to `targets`, which is a cycle, and the caller does
   // not supply a second targets document for that edge.
-  let parent = delegation_document(
-    "targets",
-    ["k1"],
-    [delegation_value("role1", ["k1"], 1, ["*"])],
-  )
-  let child = delegation_document(
-    "role1",
-    ["k1"],
-    [delegation_value("targets", ["k1"], 1, ["*"])],
-  )
+  let parent = delegation_document("targets", ["k1"], [
+    delegation_value("role1", ["k1"], 1, ["*"]),
+  ])
+  let child = delegation_document("role1", ["k1"], [
+    delegation_value("targets", ["k1"], 1, ["*"]),
+  ])
   let findings = empty_findings()
   let documents : Map[String, String] = Map([])
   documents["targets"] = parent
@@ -349,16 +324,18 @@ test "a delegation tree reports missing metadata and cycles" {
   assert_true(codes.contains("error:delegation-cycle:role1"))
   // The edge into `targets` has no second document, but `targets` is present in
   // the map, so no missing-metadata finding is expected for it.
-  assert_false(codes.contains("error:missing-delegated-metadata:targets->role1"))
+  assert_false(
+    codes.contains("error:missing-delegated-metadata:targets->role1"),
+  )
   // A child the caller never supplied is reported.
   let partial : Map[String, String] = Map([])
   partial["targets"] = parent
   let missing_findings = empty_findings()
   check_delegation_tree(partial, missing_findings)
   assert_true(
-    missing_findings.map(finding => finding.to_string()).contains(
-      "error:missing-delegated-metadata:targets->role1",
-    ),
+    missing_findings
+    .map(finding => finding.to_string())
+    .contains("error:missing-delegated-metadata:targets->role1"),
   )
 }
 
@@ -391,7 +368,9 @@ test "snapshot coverage reports mismatches and omissions" {
   let mismatch_findings = empty_findings()
   check_snapshot_coverage(snapshot, mismatched, mismatch_findings)
   assert_true(
-    mismatch_findings.map(finding => finding.to_string()).contains(
+    mismatch_findings
+    .map(finding => finding.to_string())
+    .contains(
       "error:snapshot-version-mismatch:targets.json:referenced=3,actual=4",
     ),
   )
@@ -400,16 +379,16 @@ test "snapshot coverage reports mismatches and omissions" {
   let empty = empty_findings()
   check_snapshot_coverage(no_meta, supplied, empty)
   assert_true(
-    empty.map(finding => finding.to_string()).contains(
-      "error:missing-meta:snapshot",
-    ),
+    empty
+    .map(finding => finding.to_string())
+    .contains("error:missing-meta:snapshot"),
   )
   let broken = empty_findings()
   check_snapshot_coverage("{", supplied, broken)
   assert_true(
-    broken.map(finding => finding.to_string()).contains(
-      "error:missing-signed-object:snapshot",
-    ),
+    broken
+    .map(finding => finding.to_string())
+    .contains("error:missing-signed-object:snapshot"),
   )
   // The convenience wrapper returns the same findings as strings.
   assert_eq(preflight_snapshot_coverage(snapshot, supplied), codes)

@@ -112,7 +112,7 @@ pub fn parse_delegations(targets : String) -> Array[Delegation]? {
 fn parse_delegation(entry : Json) -> Delegation {
   let fields = match entry {
     Object(fields) => fields
-    _ => {
+    _ =>
       return Delegation::{
         name: "",
         keyids: [],
@@ -122,7 +122,6 @@ fn parse_delegation(entry : Json) -> Delegation {
         terminating: false,
         well_formed: false,
       }
-    }
   }
   let name = match fields.get("name") {
     Some(String(name)) => name
@@ -221,7 +220,11 @@ fn match_glob(
       match_glob(pattern, pattern_index + 1, path, path_index + 1)
   }
   if token == '[' {
-    let (matched, consumed) = match_class(pattern, pattern_index, path[path_index])
+    let (matched, consumed) = match_class(
+      pattern,
+      pattern_index,
+      path[path_index],
+    )
     if !matched {
       return false
     }
@@ -238,11 +241,7 @@ fn match_glob(
 ///
 /// Returns whether it matched and how many pattern characters the class used.
 /// An unterminated class consumes the rest of the pattern and matches nothing.
-fn match_class(
-  pattern : Array[Char],
-  start : Int,
-  char : Char,
-) -> (Bool, Int) {
+fn match_class(pattern : Array[Char], start : Int, char : Char) -> (Bool, Int) {
   let mut index = start + 1
   let negated = index < pattern.length() &&
     (pattern[index] == '!' || pattern[index] == '^')
@@ -660,7 +659,7 @@ pub fn check_snapshot_coverage(
 pub fn preflight_delegations(targets : String) -> Array[String] {
   let findings = empty_findings()
   check_delegations(targets, findings)
-  Report::{ findings, role: "delegations", version: None }.to_strings()
+  Report::{ findings, role: "delegations", version: None, }.to_strings()
 }
 
 ///|
@@ -671,5 +670,5 @@ pub fn preflight_snapshot_coverage(
 ) -> Array[String] {
   let findings = empty_findings()
   check_snapshot_coverage(snapshot, targets_versions, findings)
-  Report::{ findings, role: "snapshot", version: None }.to_strings()
+  Report::{ findings, role: "snapshot", version: None, }.to_strings()
 }
