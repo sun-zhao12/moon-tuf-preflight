@@ -1,4 +1,14 @@
 ///|
+/// A fresh, empty findings buffer.
+///
+/// The check helpers append to a caller-owned array, so every entry point needs
+/// one; naming the constructor keeps the public API free of an inline mutable
+/// literal and gives tests a single spelling to use.
+pub fn empty_findings() -> Array[Finding] {
+  []
+}
+
+///|
 /// Severity of a single preflight finding.
 ///
 /// `Error` marks a metadata envelope that is structurally invalid for the

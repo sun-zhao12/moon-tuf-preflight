@@ -106,12 +106,6 @@ fn uniform_root(version : Int, keyid : String, threshold : Int) -> String {
 }
 
 ///|
-/// A fresh findings buffer, so the tests do not repeat the type annotation.
-fn empty_findings() -> Array[Finding] {
-  []
-}
-
-///|
 test "signature key ids and values are read in document order" {
   let document = "{\"signed\":{},\"signatures\":[{\"keyid\":\"a\",\"sig\":\"s1\"},{\"keyid\":\"b\",\"sig\":\"s2\"},{\"keyid\":\"a\",\"sig\":\"s3\"}]}"
   assert_eq(signature_keyids(document), ["a", "b", "a"])
